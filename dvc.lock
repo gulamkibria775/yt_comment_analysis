@@ -37,3 +37,32 @@ stages:
       md5: a2bbccdc23dd271231099f8d5c99ff87.dir
       size: 5098055
       nfiles: 2
+  model_building:
+    cmd: python src/model/model_building.py
+    deps:
+    - path: data/interim/train_processed.csv
+      hash: md5
+      md5: 86284f4698366b0f2ee05c211c0e9453
+      size: 4104889
+    - path: src/model/model_building.py
+      hash: md5
+      md5: 0acdac5b74a833f9a74c5e044be49b70
+      size: 5506
+    params:
+      params.yaml:
+        model_building.learning_rate: 0.09
+        model_building.max_depth: 20
+        model_building.max_features: 10000
+        model_building.n_estimators: 367
+        model_building.ngram_range:
+        - 1
+        - 3
+    outs:
+    - path: lgbm_model.pkl
+      hash: md5
+      md5: c4f07d40281405042c85b74f4042d170
+      size: 4117767
+    - path: tfidf_vectorizer.pkl
+      hash: md5
+      md5: 0cc9cafd83e15cd4f24a60838b2df236
+      size: 384098
