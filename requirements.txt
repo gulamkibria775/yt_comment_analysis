@@ -10,7 +10,7 @@
 # python-dotenv>=0.5.1
 
 #####
-﻿aiobotocore
+aiobotocore
 aiohappyeyeballs==2.3.4
 aiohttp==3.10.0
 aiohttp-retry==2.8.3
