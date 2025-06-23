@@ -35,9 +35,9 @@ jobs:
        echo "MLFLOW_TRACKING_URI=file://$(pwd)/mlruns" >> $GITHUB_ENV
 
 
-    - name: Reproduce DVC Pipeline
-      run: |
-        dvc repro
+    # - name: Reproduce DVC Pipeline
+    #   run: |
+    #     dvc repro
 
     - name: Commit and Push DVC and Git Changes
       run: |
