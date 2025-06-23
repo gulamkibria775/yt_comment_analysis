@@ -1,0 +1,54 @@
+name: CICD Pipeline
+
+on:
+  push:
+    branches: [main]  # or your preferred branch
+
+jobs:
+  model-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Reproduce DVC Pipeline
+      run: |
+        dvc repro
+
+    - name: Commit and Push DVC and Git Changes
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add .
+        git commit -m "Auto: Update pipeline artifacts" || echo "No changes to commit"
+        git push origin ${{ github.ref_name }}
+
+    # - name: Run Pytest (unit tests)
+    #   run: |
+    #     pip install pytest
+    #     pytest scripts/test_load_model.py || exit 1
+    #     pytest scripts/test_model_signature.py || exit 1
+    #     pytest scripts/test_model_performance.py || exit 1
+
+    - name: Register model to local MLflow
+      run: |
+        python src/model/register_model.py

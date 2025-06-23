@@ -1,0 +1,14 @@
+artifact_uri: mlflow-artifacts:/643402312683406132/f1a375ea41ac46318964457fe65b67c7/artifacts
+end_time: 1750674816517
+entry_point_name: ''
+experiment_id: '643402312683406132'
+lifecycle_stage: active
+run_id: f1a375ea41ac46318964457fe65b67c7
+run_name: trusting-grub-396
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750674811583
+status: 3
+tags: []
+user_id: kibria

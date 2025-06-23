@@ -4,6 +4,7 @@ import pickle
 import logging
 import yaml
 import mlflow
+import mlflow.sklearn
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.feature_extraction.text import TfidfVectorizer
 import os
@@ -12,10 +13,7 @@ import seaborn as sns
 import json
 from mlflow.models import infer_signature
 
-import dagshub  
-dagshub.init(repo_owner='gulamkibria775', repo_name='yt_comment_analysis', mlflow=True)
-
-# ---------------------- Logging Configuration ----------------------
+# logging configuration
 logger = logging.getLogger('model_evaluation')
 logger.setLevel('DEBUG')
 
@@ -33,18 +31,20 @@ logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
 
-# ---------------------- Utility Functions ----------------------
 def load_data(file_path: str) -> pd.DataFrame:
+    """Load data from a CSV file."""
     try:
         df = pd.read_csv(file_path)
-        df.fillna('', inplace=True)
+        df.fillna('', inplace=True)  # Fill any NaN values
         logger.debug('Data loaded and NaNs filled from %s', file_path)
         return df
     except Exception as e:
         logger.error('Error loading data from %s: %s', file_path, e)
         raise
 
+
 def load_model(model_path: str):
+    """Load the trained model."""
     try:
         with open(model_path, 'rb') as file:
             model = pickle.load(file)
@@ -54,7 +54,9 @@ def load_model(model_path: str):
         logger.error('Error loading model from %s: %s', model_path, e)
         raise
 
+
 def load_vectorizer(vectorizer_path: str) -> TfidfVectorizer:
+    """Load the saved TF-IDF vectorizer."""
     try:
         with open(vectorizer_path, 'rb') as file:
             vectorizer = pickle.load(file)
@@ -64,7 +66,9 @@ def load_vectorizer(vectorizer_path: str) -> TfidfVectorizer:
         logger.error('Error loading vectorizer from %s: %s', vectorizer_path, e)
         raise
 
+
 def load_params(params_path: str) -> dict:
+    """Load parameters from a YAML file."""
     try:
         with open(params_path, 'r') as file:
             params = yaml.safe_load(file)
@@ -74,29 +78,39 @@ def load_params(params_path: str) -> dict:
         logger.error('Error loading parameters from %s: %s', params_path, e)
         raise
 
+
 def evaluate_model(model, X_test: np.ndarray, y_test: np.ndarray):
+    """Evaluate the model and log classification metrics and confusion matrix."""
     try:
+        # Predict and calculate classification metrics
         y_pred = model.predict(X_test)
         report = classification_report(y_test, y_pred, output_dict=True)
         cm = confusion_matrix(y_test, y_pred)
+        
         logger.debug('Model evaluation completed')
+
         return report, cm
     except Exception as e:
         logger.error('Error during model evaluation: %s', e)
         raise
 
+
 def log_confusion_matrix(cm, dataset_name):
+    """Log confusion matrix as an artifact."""
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
     plt.title(f'Confusion Matrix for {dataset_name}')
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
+
+    # Save confusion matrix plot as a file and log it to MLflow
     cm_file_path = f'confusion_matrix_{dataset_name}.png'
     plt.savefig(cm_file_path)
     mlflow.log_artifact(cm_file_path)
     plt.close()
 
 def save_model_info(run_id: str, model_path: str, file_path: str) -> None:
+    """Save the model run ID and path to a JSON file."""
     try:
         model_info = {
             'run_id': run_id,
@@ -110,11 +124,11 @@ def save_model_info(run_id: str, model_path: str, file_path: str) -> None:
         raise
 
 
-# ---------------------- Main Pipeline ----------------------
 def main():
-    mlflow.set_tracking_uri("https://dagshub.com/gulamkibria775/yt_comment_analysis.mlflow")
-    mlflow.set_experiment('dvc-pipeline-runs')
+    mlflow.set_tracking_uri("http://127.0.0.1:5001")
 
+    mlflow.set_experiment('dvc-pipeline-runs')
+    
     with mlflow.start_run() as run:
         try:
             root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -123,46 +137,46 @@ def main():
             # Log parameters
             for key, value in params.items():
                 mlflow.log_param(key, value)
-
-            # Load model and vectorizer
+            
             model = load_model(os.path.join(root_dir, 'lgbm_model.pkl'))
             vectorizer = load_vectorizer(os.path.join(root_dir, 'tfidf_vectorizer.pkl'))
 
-            # Load test data
             test_data = load_data(os.path.join(root_dir, 'data/interim/test_processed.csv'))
+
             X_test_tfidf = vectorizer.transform(test_data['clean_comment'].values)
             y_test = test_data['category'].values
 
-            # Evaluate model
-            report, cm = evaluate_model(model, X_test_tfidf, y_test)
+            input_example = pd.DataFrame(X_test_tfidf.toarray()[:5], columns=vectorizer.get_feature_names_out())
+            signature = infer_signature(input_example, model.predict(X_test_tfidf[:5]))
 
-            # Log classification report metrics
-            for label, metrics in report.items():
-                if isinstance(metrics, dict):
-                    mlflow.log_metrics({
-                        f"test_{label}_precision": metrics['precision'],
-                        f"test_{label}_recall": metrics['recall'],
-                        f"test_{label}_f1-score": metrics['f1-score']
-                    })
+            mlflow.sklearn.log_model(
+                model,
+                "lgbm_model",
+                signature=signature,
+                input_example=input_example
+            )
 
-            # Log confusion matrix
-            log_confusion_matrix(cm, "Test Data")
-
-            # Save model to file
-            model_path = "lgbm_model.pkl"
-            with open(model_path, "wb") as f:
-                pickle.dump(model, f)
-
-            # Log model as artifact
-            mlflow.log_artifact(model_path)
-
-            # Save model run info
+            model_path = "lgbm_model"
             save_model_info(run.info.run_id, model_path, 'experiment_info.json')
 
-            # Log vectorizer
             mlflow.log_artifact(os.path.join(root_dir, 'tfidf_vectorizer.pkl'))
 
-            # Add MLflow tags
+            report, cm = evaluate_model(model, X_test_tfidf, y_test)
+
+            # Safer logging of metrics (fix for yaml.representer.RepresenterError)
+            for label, metrics in report.items():
+                if isinstance(metrics, dict):
+                    for metric_name in ['precision', 'recall', 'f1-score']:
+                        value = metrics.get(metric_name)
+                        if value is not None and not isinstance(value, str):
+                            try:
+                                val_float = float(value)
+                                mlflow.log_metric(f"test_{label}_{metric_name}", val_float)
+                            except Exception as e:
+                                logger.warning(f"Skipping metric {metric_name} for label {label} due to conversion error: {e}")
+
+            log_confusion_matrix(cm, "Test Data")
+
             mlflow.set_tag("model_type", "LightGBM")
             mlflow.set_tag("task", "Sentiment Analysis")
             mlflow.set_tag("dataset", "YouTube Comments")
