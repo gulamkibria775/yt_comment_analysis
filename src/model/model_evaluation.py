@@ -124,11 +124,83 @@ def save_model_info(run_id: str, model_path: str, file_path: str) -> None:
         raise
 
 
-def main():
-    mlflow.set_tracking_uri("http://127.0.0.1:5001")
+# def main():
+#     mlflow.set_tracking_uri("http://127.0.0.1:5001")
 
-    mlflow.set_experiment('dvc-pipeline-runs')
+#     mlflow.set_experiment('dvc-pipeline-runs')
     
+#     with mlflow.start_run() as run:
+#         try:
+#             root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+#             params = load_params(os.path.join(root_dir, 'params.yaml'))
+
+#             # Log parameters
+#             for key, value in params.items():
+#                 mlflow.log_param(key, value)
+            
+#             model = load_model(os.path.join(root_dir, 'lgbm_model.pkl'))
+#             vectorizer = load_vectorizer(os.path.join(root_dir, 'tfidf_vectorizer.pkl'))
+
+#             test_data = load_data(os.path.join(root_dir, 'data/interim/test_processed.csv'))
+
+#             X_test_tfidf = vectorizer.transform(test_data['clean_comment'].values)
+#             y_test = test_data['category'].values
+
+#             input_example = pd.DataFrame(X_test_tfidf.toarray()[:5], columns=vectorizer.get_feature_names_out())
+#             signature = infer_signature(input_example, model.predict(X_test_tfidf[:5]))
+
+#             mlflow.sklearn.log_model(
+#                 model,
+#                 "lgbm_model",
+#                 signature=signature,
+#                 input_example=input_example
+#             )
+
+#             model_path = "lgbm_model"
+#             save_model_info(run.info.run_id, model_path, 'experiment_info.json')
+
+#             mlflow.log_artifact(os.path.join(root_dir, 'tfidf_vectorizer.pkl'))
+
+#             report, cm = evaluate_model(model, X_test_tfidf, y_test)
+
+#             # Safer logging of metrics (fix for yaml.representer.RepresenterError)
+#             for label, metrics in report.items():
+#                 if isinstance(metrics, dict):
+#                     for metric_name in ['precision', 'recall', 'f1-score']:
+#                         value = metrics.get(metric_name)
+#                         if value is not None and not isinstance(value, str):
+#                             try:
+#                                 val_float = float(value)
+#                                 mlflow.log_metric(f"test_{label}_{metric_name}", val_float)
+#                             except Exception as e:
+#                                 logger.warning(f"Skipping metric {metric_name} for label {label} due to conversion error: {e}")
+
+#             log_confusion_matrix(cm, "Test Data")
+
+#             mlflow.set_tag("model_type", "LightGBM")
+#             mlflow.set_tag("task", "Sentiment Analysis")
+#             mlflow.set_tag("dataset", "YouTube Comments")
+
+#         except Exception as e:
+#             logger.error(f"Failed to complete model evaluation: {e}")
+#             print(f"Error: {e}")
+
+#####################################################
+# write this bash command
+# export MLFLOW_TRACKING_URI=http://127.0.0.1:5001
+# python src/model/model_evaluation.py
+# #
+#####################################################
+
+
+def main():
+    import os
+
+    # Use MLFLOW_TRACKING_URI from environment if available, else default to local
+    mlflow_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5001")
+    mlflow.set_tracking_uri(mlflow_uri)
+    mlflow.set_experiment('dvc-pipeline-runs')
+
     with mlflow.start_run() as run:
         try:
             root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -137,7 +209,7 @@ def main():
             # Log parameters
             for key, value in params.items():
                 mlflow.log_param(key, value)
-            
+
             model = load_model(os.path.join(root_dir, 'lgbm_model.pkl'))
             vectorizer = load_vectorizer(os.path.join(root_dir, 'tfidf_vectorizer.pkl'))
 
@@ -184,6 +256,7 @@ def main():
         except Exception as e:
             logger.error(f"Failed to complete model evaluation: {e}")
             print(f"Error: {e}")
+
 
 if __name__ == '__main__':
     main()

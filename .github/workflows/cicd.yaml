@@ -29,6 +29,11 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install -r requirements.txt
+    
+    - name: Set MLflow tracking URI (local logging)
+      run: |
+       echo "MLFLOW_TRACKING_URI=file://$(pwd)/mlruns" >> $GITHUB_ENV
+
 
     - name: Reproduce DVC Pipeline
       run: |
